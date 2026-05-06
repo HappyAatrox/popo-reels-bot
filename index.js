@@ -8,18 +8,40 @@ const USERNAME = "popo.gambler";
 
 app.get('/latest-reel', async (req, res) => {
     try {
-        // Używamy Dumpor (lepsza alternatywa dla Picuki w 2026)
-        const { data } = await axios.get(`https://dumpor.com/v/${USERNAME}`, {
-            headers: { 'User-Agent': 'Mozilla/5.0' }
-        });
+        const urls = [
+            `https://imginn.com/${USERNAME}/`,           // Najlepsza alternatywa 2026
+            `https://dumpor.com/v/${USERNAME}`,
+            `https://inflact.com/instagram-viewer/profile/${USERNAME}/`
+        ];
 
-        const $ = cheerio.load(data);
+        let html = '';
+        let source = '';
+
+        for (let url of urls) {
+            try {
+                const response = await axios.get(url, {
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                    },
+                    timeout: 8000
+                });
+                html = response.data;
+                source = url;
+                break;
+            } catch (e) {}
+        }
+
+        const $ = cheerio.load(html);
         let reelLink = null;
-        let caption = "Nowa rolka!";
+        let caption = "Nowa rolka od @popo.gambler 🔥";
 
-        // Szukamy najnowszego reel'a
-        $('a[href*="/reel/"]').first().each((i, el) => {
-            reelLink = 'https://www.instagram.com' + $(el).attr('href');
+        // Szukanie reelów
+        $('a[href*="/reel/"], a[href*="/p/"]').each((i, el) => {
+            const href = $(el).attr('href');
+            if (href && (href.includes('/reel/') || href.includes('/p/'))) {
+                reelLink = 'https://www.instagram.com' + href;
+                return false; // bierzemy pierwszy (najnowszy)
+            }
         });
 
         if (reelLink) {
@@ -30,15 +52,22 @@ ${caption}
 
 🔗 Obejrzyj rolkę: ${reelLink}
 
-📍 Wszystkie rolki: https://www.instagram.com/${USERNAME}/reels
+📍 Wszystkie rolki → https://www.instagram.com/${USERNAME}/reels
             `.trim());
         } else {
-            res.send(`🔥 @${USERNAME} — nie znaleziono nowych rolek w tej chwili.`);
+            res.send(`🔥 @${USERNAME} — nie znaleziono nowych rolek w tej chwili.\nSpróbuj za chwilę!`);
         }
 
     } catch (error) {
-        res.send(`❌ Nie udało się pobrać najnowszej rolki. Spróbuj później.`);
+        console.error(error);
+        res.send(`❌ Błąd pobierania. Instagram mocno blokuje. Spróbuj za 5-10 minut.`);
     }
 });
 
-app.listen(PORT, () => console.log(`Serwer działa`));
+app.get('/', (req, res) => {
+    res.send('Serwer działa - użyj /latest-reel');
+});
+
+app.listen(PORT, () => {
+    console.log(`✅ Serwer działa na porcie ${PORT}`);
+});

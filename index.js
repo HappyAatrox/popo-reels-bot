@@ -8,41 +8,51 @@ const USERNAME = "popo.gambler";
 
 app.get('/latest-reel', async (req, res) => {
     try {
-        const urls = [
+        // Kolejność viewerów - najlepsze działające w maj 2026
+        const viewers = [
             `https://imginn.com/${USERNAME}/`,
-            `https://dumpor.com/v/${USERNAME}`,
+            `https://dumpor.io/v/${USERNAME}`,     // zmienione na .io
+            `https://greatfon.com/profile/${USERNAME}`,
             `https://inflact.com/instagram-viewer/profile/${USERNAME}/`
         ];
 
         let html = '';
-        let usedSource = '';
+        let successUrl = '';
 
-        for (let url of urls) {
+        for (let url of viewers) {
             try {
                 const response = await axios.get(url, {
                     headers: {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36',
+                        'Accept': 'text/html,application/xhtml+xml'
                     },
-                    timeout: 10000
+                    timeout: 12000
                 });
                 html = response.data;
-                usedSource = url;
+                successUrl = url;
+                console.log(`✅ Użyto: ${url}`);
                 break;
-            } catch (e) {}
+            } catch (err) {
+                console.log(`❌ Nie działa: ${url}`);
+            }
+        }
+
+        if (!html) {
+            return res.send(`🔥 @popo.gambler\n\nNie udało się pobrać danych w tej chwili.\nSpróbuj za 10-15 minut.`);
         }
 
         const $ = cheerio.load(html);
         let reelLink = null;
-        let caption = "Najnowsza rolka @popo.gambler";
+        let caption = "Najnowsza rolka @popo.gambler 🔥";
 
-        // Szukamy pierwszej (najnowszej) rolki
-        $('a[href*="/reel/"], a[href*="/p/"]').each((i, el) => {
-            const href = $(el).attr('href');
-            if (href && (href.includes('/reel/') || href.includes('/p/'))) {
+        // Lepsze selektory
+        $('a').each((i, el) => {
+            const href = $(el).attr('href') || '';
+            if (href.includes('/reel/') || href.includes('/p/')) {
                 reelLink = 'https://www.instagram.com' + (href.startsWith('/') ? href : '/' + href);
-                // Próba wyciągnięcia opisu
-                const postText = $(el).closest('.post, .item').find('.description, .caption, .post-description').text().trim();
-                if (postText) caption = postText.slice(0, 180) + (postText.length > 180 ? '...' : '');
+                // Spróbuj wyciągnąć opis
+                const text = $(el).text().trim() || $(el).attr('title') || $(el).closest('div').text().trim();
+                if (text && text.length > 10) caption = text.slice(0, 160);
                 return false;
             }
         });
@@ -58,16 +68,14 @@ ${caption}
 📍 Wszystkie rolki → https://www.instagram.com/${USERNAME}/reels
             `.trim());
         } else {
-            res.send(`🔥 @popo.gambler\n\nNie udało się pobrać rolki w tej chwili. Spróbuj za chwilę.`);
+            res.send(`🔥 @popo.gambler\n\nZnaleziono profil, ale nie udało się wyciągnąć najnowszej rolki.\nSpróbuj za chwilę.`);
         }
 
     } catch (error) {
-        res.send(`❌ Błąd połączenia. Spróbuj za kilka minut.`);
+        res.send(`❌ Błąd serwera. Spróbuj za kilka minut.`);
     }
 });
 
-app.get('/', (req, res) => res.send('Serwer działa - użyj /latest-reel'));
+app.get('/', (req, res) => res.send('Serwer działa — użyj /latest-reel'));
 
-app.listen(PORT, () => {
-    console.log(`✅ Serwer działa`);
-});
+app.listen(PORT, () => console.log(`✅ Serwer działa`));
